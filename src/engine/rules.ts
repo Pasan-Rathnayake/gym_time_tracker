@@ -12,7 +12,7 @@ export interface RestPlan {
 export const REST_PLANS: RestPlan[] = [
   { id: 1, lines: ['2 min', 'every set'], detail: '2 min every set' },
   { id: 2, lines: ['1 min sets', '2 min exercises'], detail: '1 min between sets, 2 min between exercises' },
-  { id: 3, lines: ['2 min press', '1 min iso'], detail: '2 min after presses, 1 min after isolation moves, 2 min between exercises' },
+  { id: 3, lines: ['2 min compound', '1 min iso'], detail: '2 min after compound lifts, 1 min after isolation moves, 2 min between exercises' },
 ];
 
 export const MIN = 60_000;

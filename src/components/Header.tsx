@@ -1,18 +1,19 @@
 import { formatClock, formatMinutes } from '../engine';
 
 interface Props {
+  title: string;
   done: number;
   total: number;
   planTotalMs: number;
   timeLeftMs: number;
 }
 
-export function Header({ done, total, planTotalMs, timeLeftMs }: Props) {
+export function Header({ title, done, total, planTotalMs, timeLeftMs }: Props) {
   const pct = total ? Math.round((done / total) * 100) : 0;
   return (
     <header className="header">
       <div className="header__row">
-        <h1 className="header__title">Push Day</h1>
+        <h1 className="header__title">{title}</h1>
         <dl className="header__stats">
           <div>
             <dt>Steps</dt>

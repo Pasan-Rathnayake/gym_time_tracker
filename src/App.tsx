@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { READY_SEC, WORKOUT } from './config/workout';
+import { DAYS, READY_SEC, type WorkoutDay } from './config/workout';
 import {
   formatClock,
   indexItems,
@@ -15,6 +15,7 @@ import {
   restAfter,
   restBetweenSets,
   restLocked,
+  stopwatchElapsed,
   timeLeft,
   type Action,
   type PlanId,
@@ -24,7 +25,10 @@ import { usePersistentState } from './hooks/usePersistentState';
 import { useSound } from './hooks/useSound';
 import { useTicker } from './hooks/useTicker';
 import { useWakeLock } from './hooks/useWakeLock';
+import { DayPicker } from './components/DayPicker';
 import { ExerciseCard, type ChipView } from './components/ExerciseCard';
+import { GymMode } from './components/GymMode';
+import { phaseView, type PhaseActionId } from './components/phaseView';
 import { Header } from './components/Header';
 import { PhaseTimer } from './components/PhaseTimer';
 import { ReminderCard } from './components/ReminderCard';
@@ -32,17 +36,46 @@ import { RestPlanPicker } from './components/RestPlanPicker';
 import { Stopwatch } from './components/Stopwatch';
 import { Toast } from './components/Toast';
 
-const STORAGE_KEY = 'push-day:session:v1';
-const reducer = makeReducer(WORKOUT);
-const byId = indexItems(WORKOUT);
+const GYM_KEY = 'push-day:gym-mode';
+const DAY_KEY = 'gym:active-day';
 
+/** Picks the workout day; each day keeps its own saved progress. */
 export function App() {
+  const [dayId, setDayId] = useState(() => {
+    try {
+      return localStorage.getItem(DAY_KEY) ?? DAYS[0].id;
+    } catch {
+      return DAYS[0].id;
+    }
+  });
+  const day = DAYS.find((d) => d.id === dayId) ?? DAYS[0];
+  const switchDay = useCallback((id: string) => {
+    setDayId(id);
+    try {
+      localStorage.setItem(DAY_KEY, id);
+    } catch {
+      /* ignore */
+    }
+    window.scrollTo(0, 0);
+  }, []);
+
+  useEffect(() => {
+    document.title = day.short;
+  }, [day]);
+
+  return <Workout key={day.id} day={day} onSwitchDay={switchDay} />;
+}
+
+function Workout({ day, onSwitchDay }: { day: WorkoutDay; onSwitchDay: (id: string) => void }) {
+  const WORKOUT = day.items;
+  const reducer = useMemo(() => makeReducer(WORKOUT), [WORKOUT]);
+  const byId = useMemo(() => indexItems(WORKOUT), [WORKOUT]);
   const [state, setState] = usePersistentState<SessionState>(
-    STORAGE_KEY,
+    day.storageKey,
     () => initialState(WORKOUT),
     (raw) => normalizeState(raw, WORKOUT),
   );
-  const dispatch = useCallback((a: Action) => setState((s) => reducer(s, a)), [setState]);
+  const dispatch = useCallback((a: Action) => setState((s) => reducer(s, a)), [setState, reducer]);
 
   const { phase, stopwatch } = state;
   const timedPhase = phase.kind === 'ready' || phase.kind === 'work' || phase.kind === 'rest';
@@ -57,7 +90,27 @@ export function App() {
         : 0;
   const now = Math.max(tickNow, anchor, stopwatch.runningSince ?? 0);
   const sound = useSound();
-  useWakeLock(running);
+
+  // Gym mode is a per-device view preference.
+  const [gymMode, setGymModeState] = useState(() => {
+    try {
+      return localStorage.getItem(GYM_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const setGymMode = useCallback((on: boolean) => {
+    setGymModeState(on);
+    try {
+      localStorage.setItem(GYM_KEY, on ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const exitGymMode = useCallback(() => setGymMode(false), [setGymMode]);
+
+  // Keep the screen on during the workout, and whenever gym mode is open.
+  const wake = useWakeLock(running || gymMode);
 
   // Advance ready → work → done when their end timestamps pass.
   useEffect(() => {
@@ -124,6 +177,17 @@ export function App() {
     [items],
   );
   const locked = restLocked(state, now);
+  const view = phaseView(phase, now, locked, byId, next);
+  const onPhaseAction = (id: PhaseActionId) => {
+    const t = Date.now();
+    if (id === 'start') dispatch({ type: 'startReady', now: t });
+    else if (id === 'startNow') dispatch({ type: 'startWork', now: t });
+    else if (id === 'cancel') dispatch({ type: 'cancelReady' });
+    else if (id === 'doneEarly') dispatch({ type: 'finishSet', now: t });
+    else dispatch({ type: 'dismissRest', now: t });
+  };
+  const reminder = reminderFor(WORKOUT, state);
+  const left = timeLeft(WORKOUT, state, now);
   const canStartFromChip = phase.kind === 'idle' || phase.kind === 'complete' || (phase.kind === 'rest' && !locked);
 
   const onChip = (itemId: string, set: number) => {
@@ -145,30 +209,21 @@ export function App() {
   return (
     <div className="app" data-phase={phase.kind}>
       <div className="console">
-        <Header done={done} total={total} planTotalMs={totals[state.plan]} timeLeftMs={timeLeft(WORKOUT, state, now)} />
-        <PhaseTimer
-          phase={phase}
-          now={now}
-          locked={locked}
-          byId={byId}
-          next={next}
-          onStart={() => dispatch({ type: 'startReady', now: Date.now() })}
-          onStartNow={() => dispatch({ type: 'startWork', now: Date.now() })}
-          onCancel={() => dispatch({ type: 'cancelReady' })}
-          onDoneEarly={() => dispatch({ type: 'finishSet', now: Date.now() })}
-          onDismiss={() => dispatch({ type: 'dismissRest', now: Date.now() })}
-        />
+        <Header title={day.short} done={done} total={total} planTotalMs={totals[state.plan]} timeLeftMs={left} />
+        <PhaseTimer view={view} onAction={onPhaseAction} />
         <Stopwatch
           stopwatch={stopwatch}
           now={now}
           onPause={() => dispatch({ type: 'stopwatchPause', now: Date.now() })}
           onResume={() => dispatch({ type: 'stopwatchResume', now: Date.now() })}
           onReset={() => dispatch({ type: 'stopwatchReset', now: Date.now() })}
+          onGymMode={() => setGymMode(true)}
         />
       </div>
 
       <main className="content">
-        <ReminderCard reminder={reminderFor(WORKOUT, state)} />
+        <DayPicker days={DAYS} activeId={day.id} locked={timedPhase} onChange={onSwitchDay} />
+        <ReminderCard reminder={reminder} />
 
         <RestPlanPicker plan={state.plan} totals={totals} onChange={(plan) => dispatch({ type: 'setPlan', plan, now: Date.now() })} />
 
@@ -237,6 +292,20 @@ export function App() {
           </button>
         </div>
       </main>
+
+      {gymMode && (
+        <GymMode
+          view={view}
+          onAction={onPhaseAction}
+          onExit={exitGymMode}
+          done={done}
+          total={total}
+          timeLeftMs={left}
+          workoutMs={stopwatchElapsed(stopwatch, now)}
+          reminder={reminder}
+          wake={wake}
+        />
+      )}
 
       <Toast toast={state.toast} />
     </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { READY_SEC, WORKOUT, type WorkoutItem } from '../config/workout';
+import { DAYS, INCLUDE_TIMED_BLOCKS, LEG_DAY_ITEMS, PUSH_DAY_ITEMS, READY_SEC, type WorkoutItem } from '../config/workout';
 import {
   MIN,
   indexItems,
@@ -18,6 +18,9 @@ import {
   type SessionState,
 } from './index';
 
+// Engine rules are tested against the full definition (with timed blocks),
+// whatever the app currently has switched on.
+const WORKOUT = PUSH_DAY_ITEMS;
 const byId = indexItems(WORKOUT);
 const reduce = makeReducer(WORKOUT);
 const T0 = 1_700_000_000_000;
@@ -43,6 +46,42 @@ describe('plan totals', () => {
     expect(Math.round(planTotal(WORKOUT, 1) / MIN)).toBe(80);
     expect(Math.round(planTotal(WORKOUT, 2) / MIN)).toBe(62);
     expect(Math.round(planTotal(WORKOUT, 3) / MIN)).toBe(68);
+  });
+
+  const totals = (items: WorkoutItem[]) => [1, 2, 3].map((p) => Math.round(planTotal(items, p as 1 | 2 | 3) / MIN));
+
+  it('match the expected totals for the push day the app runs', () => {
+    const push = DAYS.find((d) => d.id === 'push')!;
+    expect(totals(push.items)).toEqual(INCLUDE_TIMED_BLOCKS ? [80, 62, 68] : [65, 47, 53]);
+  });
+
+  it('match the expected totals for leg day', () => {
+    // 29 sets: 26 × 40s + leg extension 3 × 80s (one leg at a time).
+    expect(totals(LEG_DAY_ITEMS)).toEqual([77, 57, 64]);
+  });
+
+  it('every day has unique item ids and its own storage key', () => {
+    const ids = DAYS.flatMap((d) => d.items.map((i) => i.id));
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(new Set(DAYS.map((d) => d.storageKey)).size).toBe(DAYS.length);
+  });
+
+  it('leg day: plan 3 gives compound lifts 2 min and isolation 1 min', () => {
+    const legs = indexItems(LEG_DAY_ITEMS);
+    expect(restAfter(3, legs['full-squat'], legs['full-squat'])).toBe(2 * MIN);
+    expect(restAfter(3, legs['triceps-dips'], legs['triceps-dips'])).toBe(2 * MIN);
+    expect(restAfter(3, legs['leg-curl'], legs['leg-curl'])).toBe(1 * MIN);
+    expect(restAfter(3, legs['calf-raise'], undefined)).toBe(0);
+  });
+
+  it('lifts-only workout has no timed blocks and no rest after the final set', () => {
+    const lifts = PUSH_DAY_ITEMS.filter((i) => i.type === 'lift');
+    let s = initialState(lifts);
+    for (const it of lifts) s.done[it.id] = s.done[it.id].map(() => true);
+    s.done['low-high-fly'] = [true, true, false];
+    s = makeReducer(lifts)(s, { type: 'startReady', now: T0 });
+    s = makeReducer(lifts)(s, { type: 'tick', now: T0 + 60_000 });
+    expect(s.phase.kind).toBe('complete');
   });
 
   it('time left at the start equals the plan total', () => {
@@ -123,7 +162,7 @@ describe('rest rules', () => {
 });
 
 describe('session flow', () => {
-  it('ready lasts 5s, work lasts the set duration, and start/skip are locked for the first 30s of a rest', () => {
+  it('ready lasts READY_SEC, work lasts the set duration, and start/skip are locked for the first 30s of a rest', () => {
     let s = initialState(WORKOUT);
     s.done.treadmill = [true];
     s.done.warmup = [true];
@@ -159,7 +198,7 @@ describe('session flow', () => {
     s = reduce(s, { type: 'tick', now: T0 + 10 * MIN });
     expect(s.phase.kind).toBe('rest');
     if (s.phase.kind !== 'rest') return;
-    expect(s.phase.startedAt).toBe(T0 + 5_000 + 40_000);
+    expect(s.phase.startedAt).toBe(T0 + READY_SEC * 1000 + 40_000);
     expect(s.done['pec-dec'][0]).toBe(true);
   });
 
@@ -224,7 +263,7 @@ describe('bench busy reorder', () => {
   const coolIdx = (q: string[]) => q.indexOf('cooldown');
 
   it('moves an item to the end, always before the cool-down', () => {
-    const q = moveLater(WORKOUT, WORKOUT.map((i) => i.id), 'pec-dec');
+    const q = moveLater(WORKOUT, WORKOUT.map((i: WorkoutItem) => i.id), 'pec-dec');
     expect(q[q.length - 1]).toBe('cooldown');
     expect(q[q.length - 2]).toBe('pec-dec');
     expect(q).toHaveLength(WORKOUT.length);

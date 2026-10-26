@@ -30,8 +30,10 @@ interface Props {
 
 export function ExerciseCard({ item, chips, restLabel, moved, isCurrent, canBench, benchDisabled, onChip, onBench }: Props) {
   const timed = item.type !== 'lift';
-  const tag = timed ? TAGS[item.type] : item.isPress ? 'Press' : 'Isolation';
-  const meta = timed ? `${Math.round(item.durationSec / 60)} min` : `${item.sets} × ${item.reps}`;
+  const tag = timed ? TAGS[item.type] : (item.tag ?? (item.isPress ? 'Press' : 'Isolation'));
+  const meta = timed
+    ? `${Math.round(item.durationSec / 60)} min`
+    : `${item.sets} × ${item.reps}${item.note ? ` ${item.note}` : ''}`;
   const allDone = chips.every((c) => c.state === 'done');
 
   return (

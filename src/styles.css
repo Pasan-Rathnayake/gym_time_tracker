@@ -362,19 +362,35 @@ button {
   gap: 8px;
 }
 
+.stopwatch__readout {
+  display: grid;
+  margin-right: auto;
+  line-height: 1.1;
+}
+
 .stopwatch__label {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
 }
 
 .stopwatch__time {
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 700;
-  margin-right: auto;
+}
+
+.stopwatch .btn--small {
+  padding: 0 10px;
+}
+
+.btn--gym {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
+  white-space: nowrap;
 }
 
 /* ---------- content ---------- */
@@ -648,7 +664,7 @@ button {
   display: flex;
   justify-content: center;
   pointer-events: none;
-  z-index: 20;
+  z-index: 40;
   padding: 0 var(--gutter);
 }
 
@@ -673,6 +689,210 @@ button {
   }
 }
 
+/* ---------- gym mode ---------- */
+
+.gym {
+  --g-phase: #9a9da3;
+  --g-tint: #000;
+  --g-text: #d8d6d1;
+  --g-dim: #7c7f86;
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: calc(env(safe-area-inset-top) + 12px) calc(env(safe-area-inset-right) + var(--gutter))
+    calc(env(safe-area-inset-bottom) + 16px) calc(env(safe-area-inset-left) + var(--gutter));
+  background: radial-gradient(120% 70% at 50% 35%, var(--g-tint), #000 70%);
+  background-color: #000;
+  color: var(--g-text);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  transition: background-color 0.3s ease;
+}
+
+.gym[data-phase='work'] {
+  --g-phase: #ff7a2f;
+  --g-tint: #2b1206;
+}
+
+.gym[data-phase='ready'] {
+  --g-phase: #e6e4df;
+  --g-tint: #1a1b1e;
+}
+
+.gym[data-phase='rest'],
+.gym[data-phase='over'] {
+  --g-phase: #5aa0ff;
+  --g-tint: #081a33;
+}
+
+.gym[data-phase='complete'] {
+  --g-phase: #3ccf7f;
+  --g-tint: #0b2416;
+}
+
+.gym__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.gym__stats {
+  display: flex;
+  gap: 18px;
+  margin: 0;
+}
+
+.gym__stats dt {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--g-dim);
+}
+
+.gym__stats dd {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.gym__exit {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid #33363c;
+  background: transparent;
+  color: var(--g-text);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.gym__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  min-height: 0;
+}
+
+.gym__label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.8rem, 9vw, 2.6rem);
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--g-phase);
+}
+
+.gym__title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(1.2rem, 5.5vw, 1.6rem);
+  line-height: 1.15;
+  color: var(--g-text);
+}
+
+.gym__time {
+  font-size: min(30vw, 24vh);
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  color: var(--g-phase);
+  white-space: nowrap;
+}
+
+.gym__bar {
+  height: 10px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--g-phase) 18%, transparent);
+  overflow: hidden;
+}
+
+.gym__barfill {
+  height: 100%;
+  background: var(--g-phase);
+}
+
+.gym__reminder {
+  margin-top: 6px;
+  font-size: 1.05rem;
+  line-height: 1.35;
+  color: var(--g-text);
+  display: grid;
+  gap: 4px;
+}
+
+.gym__cue {
+  color: var(--g-dim);
+  font-size: 0.95rem;
+}
+
+.gym__actions {
+  display: grid;
+  gap: 10px;
+}
+
+.gym__btn {
+  min-height: 64px;
+  border-radius: 16px;
+  border: 2px solid #3a3d44;
+  background: transparent;
+  color: var(--g-text);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.gym__btn--primary {
+  min-height: 80px;
+  font-size: 1.6rem;
+  background: var(--g-phase);
+  border-color: var(--g-phase);
+  color: #000;
+}
+
+.gym__btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.gym__btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.gym[data-phase='over'] .gym__time {
+  animation: blink 1.2s ease-in-out infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.gym__wake {
+  margin-top: 2px;
+  font-size: 0.8rem;
+  text-align: center;
+  color: var(--g-dim);
+}
+
+.gym__wake--none {
+  color: #ffb27a;
+}
+
 /* Short screens: tighten the sticky console so the list stays visible. */
 @media (max-height: 700px) {
   .timer__time {
@@ -690,4 +910,30 @@ button {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* ---------- day picker ---------- */
+
+.segmented--days {
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+}
+
+.segmented__day {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+}
+
+.segmented__opt:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.segmented__hint {
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: var(--muted);
 }
