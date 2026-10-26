@@ -114,5 +114,9 @@ to **Never** for your workout.
   get 3 beeps, a vibration and a toast, and the timer counts up in overtime.
 - Switching rest plans during a rest re-times it under the new plan, keeping
   the time already spent.
+- Pull-to-refresh is blocked, and while a workout is running the browser asks
+  before reloading or closing (Chrome on Android/desktop; iPhone browsers skip
+  this prompt). A reload never loses progress, but browsers silence sound until
+  the next tap, so the app shows a "tap to turn sound back on" banner.
 - Progress survives reloads and phone locks via localStorage. **Reset
   workout** needs a second tap within 4 seconds.

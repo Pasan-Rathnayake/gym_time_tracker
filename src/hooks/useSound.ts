@@ -1,10 +1,15 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type Ctx = AudioContext;
 
-/** Synthesised cues via Web Audio. The context is unlocked on the first tap/keypress. */
+/**
+ * Synthesised cues via Web Audio. Browsers only allow audio after a tap, so the
+ * context is unlocked on the first tap/keypress (again after every page load).
+ * `ready` says whether sound can currently play.
+ */
 export function useSound() {
   const ctxRef = useRef<Ctx | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const unlock = () => {
@@ -12,9 +17,15 @@ export function useSound() {
         if (!ctxRef.current) {
           const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
           if (!AC) return;
-          ctxRef.current = new AC();
+          const created = new AC();
+          ctxRef.current = created;
+          // iOS can suspend/interrupt audio (e.g. after the phone locks).
+          created.addEventListener('statechange', () => setReady(created.state === 'running'));
         }
-        if (ctxRef.current.state === 'suspended') void ctxRef.current.resume();
+        if (ctxRef.current.state !== 'running') {
+          const c = ctxRef.current;
+          void c.resume().then(() => setReady(c.state === 'running'), () => {});
+        } else setReady(true);
         // A silent buffer fully unlocks playback on iOS.
         const ctx = ctxRef.current;
         const src = ctx.createBufferSource();
@@ -33,7 +44,7 @@ export function useSound() {
     };
   }, []);
 
-  return useMemo(() => {
+  const cues = useMemo(() => {
     const tone = (freq: number, durMs: number, delayMs = 0, gain = 0.25, type: OscillatorType = 'sine') => {
       const ctx = ctxRef.current;
       if (!ctx || ctx.state !== 'running') return;
@@ -61,4 +72,6 @@ export function useSound() {
       },
     };
   }, []);
+
+  return { cues, ready };
 }

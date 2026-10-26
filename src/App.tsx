@@ -22,6 +22,7 @@ import {
   type SessionState,
 } from './engine';
 import { usePersistentState } from './hooks/usePersistentState';
+import { useRefreshGuard } from './hooks/useRefreshGuard';
 import { useSound } from './hooks/useSound';
 import { useTicker } from './hooks/useTicker';
 import { useWakeLock } from './hooks/useWakeLock';
@@ -89,7 +90,8 @@ function Workout({ day, onSwitchDay }: { day: WorkoutDay; onSwitchDay: (id: stri
         ? phase.endAt - READY_SEC * 1000
         : 0;
   const now = Math.max(tickNow, anchor, stopwatch.runningSince ?? 0);
-  const sound = useSound();
+  const { cues: sound, ready: soundReady } = useSound();
+  useRefreshGuard(running);
 
   // Gym mode is a per-device view preference.
   const [gymMode, setGymModeState] = useState(() => {
@@ -222,7 +224,12 @@ function Workout({ day, onSwitchDay }: { day: WorkoutDay; onSwitchDay: (id: stri
       </div>
 
       <main className="content">
-        <DayPicker days={DAYS} activeId={day.id} locked={timedPhase} onChange={onSwitchDay} />
+        <DayPicker
+          days={DAYS}
+          activeId={day.id}
+          locked={phase.kind === 'ready' || phase.kind === 'work' || (phase.kind === 'rest' && now < phase.endAt)}
+          onChange={onSwitchDay}
+        />
         <ReminderCard reminder={reminder} />
 
         <RestPlanPicker plan={state.plan} totals={totals} onChange={(plan) => dispatch({ type: 'setPlan', plan, now: Date.now() })} />
@@ -305,6 +312,12 @@ function Workout({ day, onSwitchDay }: { day: WorkoutDay; onSwitchDay: (id: stri
           reminder={reminder}
           wake={wake}
         />
+      )}
+
+      {running && !soundReady && (
+        <div className="sound-banner" role="status">
+          Sound is off after reloading. Tap anywhere to turn it back on.
+        </div>
       )}
 
       <Toast toast={state.toast} />
