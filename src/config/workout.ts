@@ -110,7 +110,6 @@ export const LEG_DAY_ITEMS: WorkoutItem[] = [
 
 /** Day 3, Back & Biceps. */
 export const PULL_DAY_ITEMS: WorkoutItem[] = [
-  lift('pullups', 'Pull-ups', 3, { compound: true, tag: 'Compound' }),
   lift('smith-row', 'Smith Machine Row', 4, { compound: true, tag: 'Compound' }),
   lift('supinated-pulldown', 'Supinated Pull Down', 3, { compound: true, tag: 'Compound' }),
   lift('t-bar-row', 'T-Bar Row', 3, { compound: true, tag: 'Compound' }),
@@ -179,7 +178,6 @@ export const FORM_CUES: Record<string, string> = {
   'leg-extension': 'One leg at a time. Pause and squeeze at the top, lower slowly.',
   'triceps-dips': 'Body upright, lower until the elbows hit 90°, press to lockout.',
   'calf-raise': 'Full stretch at the bottom, pause up high on the toes.',
-  pullups: 'Start from a dead hang, pull your chest to the bar, lower under control.',
   'smith-row': 'Hinge to about 45°, flat back, pull the bar to your lower ribs.',
   'supinated-pulldown': 'Palms facing you, lean back slightly and pull to the upper chest.',
   't-bar-row': 'Chest up, back flat, drive the elbows back and squeeze.',
