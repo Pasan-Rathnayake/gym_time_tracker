@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DAYS, INCLUDE_TIMED_BLOCKS, LEG_DAY_ITEMS, PUSH_DAY_ITEMS, READY_SEC, type WorkoutItem } from '../config/workout';
+import { DAYS, FORM_CUES, INCLUDE_TIMED_BLOCKS, LEG_DAY_ITEMS, PULL_DAY_ITEMS, PUSH_DAY_ITEMS, READY_SEC, type WorkoutItem } from '../config/workout';
 import {
   MIN,
   indexItems,
@@ -60,10 +60,20 @@ describe('plan totals', () => {
     expect(totals(LEG_DAY_ITEMS)).toEqual([77, 57, 64]);
   });
 
+  it('match the expected totals for pull day', () => {
+    // 34 sets: 31 × 40s + one arm row 3 × 80s (one arm at a time).
+    expect(totals(PULL_DAY_ITEMS)).toEqual([91, 68, 78]);
+  });
+
   it('every day has unique item ids and its own storage key', () => {
     const ids = DAYS.flatMap((d) => d.items.map((i) => i.id));
     expect(new Set(ids).size).toBe(ids.length);
     expect(new Set(DAYS.map((d) => d.storageKey)).size).toBe(DAYS.length);
+  });
+
+  it('every lift on every day has a form cue', () => {
+    const missing = DAYS.flatMap((d) => d.items).filter((i) => i.type === 'lift' && !FORM_CUES[i.id]);
+    expect(missing.map((i) => i.id)).toEqual([]);
   });
 
   it('leg day: plan 3 gives compound lifts 2 min and isolation 1 min', () => {

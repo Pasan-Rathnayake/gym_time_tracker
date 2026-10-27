@@ -108,6 +108,22 @@ export const LEG_DAY_ITEMS: WorkoutItem[] = [
   lift('calf-raise', 'Calf Raises', 3),
 ];
 
+/** Day 3, Back & Biceps. */
+export const PULL_DAY_ITEMS: WorkoutItem[] = [
+  lift('pullups', 'Pull-ups', 3, { compound: true, tag: 'Compound' }),
+  lift('smith-row', 'Smith Machine Row', 3, { compound: true, tag: 'Compound' }),
+  lift('supinated-pulldown', 'Supinated Pull Down', 3, { compound: true, tag: 'Compound' }),
+  lift('t-bar-row', 'T-Bar Row', 3, { compound: true, tag: 'Compound' }),
+  lift('cable-curl', 'Cable Biceps Curl', 4),
+  lift('straight-arm-pulldown', 'Straight Arm Pull Down', 3),
+  lift('hammer-curl', 'Hammer Curl', 3),
+  // One arm at a time, so each set gets twice the time (40s per arm).
+  lift('one-arm-row', 'One Arm Row', 3, { compound: true, tag: 'Compound', note: 'each arm', durationSec: LIFT_SET_SEC * 2 }),
+  lift('reverse-curl', 'Reverse Curl', 3),
+  lift('shrugs', 'Shrugs', 3, { reps: 12 }),
+  lift('forearms', 'Forearms', 3),
+];
+
 /** The workout days, in the order shown on the day picker. */
 export const DAYS: WorkoutDay[] = [
   {
@@ -123,6 +139,13 @@ export const DAYS: WorkoutDay[] = [
     short: 'Leg Day',
     items: liftsOnly(LEG_DAY_ITEMS),
     storageKey: 'leg-day:session:v1',
+  },
+  {
+    id: 'pull',
+    name: 'Back & Biceps',
+    short: 'Pull Day',
+    items: liftsOnly(PULL_DAY_ITEMS),
+    storageKey: 'pull-day:session:v1',
   },
 ];
 
@@ -156,6 +179,17 @@ export const FORM_CUES: Record<string, string> = {
   'leg-extension': 'One leg at a time. Pause and squeeze at the top, lower slowly.',
   'triceps-dips': 'Body upright, lower until the elbows hit 90°, press to lockout.',
   'calf-raise': 'Full stretch at the bottom, pause up high on the toes.',
+  pullups: 'Start from a dead hang, pull your chest to the bar, lower under control.',
+  'smith-row': 'Hinge to about 45°, flat back, pull the bar to your lower ribs.',
+  'supinated-pulldown': 'Palms facing you, lean back slightly and pull to the upper chest.',
+  't-bar-row': 'Chest up, back flat, drive the elbows back and squeeze.',
+  'cable-curl': 'Elbows fixed at your sides, curl all the way up and lower slowly.',
+  'straight-arm-pulldown': 'Arms long with soft elbows, sweep down to the thighs using the lats.',
+  'hammer-curl': 'Thumbs up, no swinging, keep the elbows still.',
+  'one-arm-row': 'One arm at a time. Brace on the bench and pull the elbow to your hip.',
+  'reverse-curl': 'Palms down, wrists straight, lower slowly.',
+  shrugs: 'Lift straight up toward the ears, pause, no rolling.',
+  forearms: 'Full range at the wrist, slow and controlled.',
 };
 
 /** Guides shown during the timed blocks, keyed by item id. */
