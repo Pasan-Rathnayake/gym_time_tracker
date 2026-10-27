@@ -111,7 +111,7 @@ export const LEG_DAY_ITEMS: WorkoutItem[] = [
 /** Day 3, Back & Biceps. */
 export const PULL_DAY_ITEMS: WorkoutItem[] = [
   lift('pullups', 'Pull-ups', 3, { compound: true, tag: 'Compound' }),
-  lift('smith-row', 'Smith Machine Row', 3, { compound: true, tag: 'Compound' }),
+  lift('smith-row', 'Smith Machine Row', 4, { compound: true, tag: 'Compound' }),
   lift('supinated-pulldown', 'Supinated Pull Down', 3, { compound: true, tag: 'Compound' }),
   lift('t-bar-row', 'T-Bar Row', 3, { compound: true, tag: 'Compound' }),
   lift('cable-curl', 'Cable Biceps Curl', 4),

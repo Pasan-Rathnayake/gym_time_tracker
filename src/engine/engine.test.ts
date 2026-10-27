@@ -61,8 +61,8 @@ describe('plan totals', () => {
   });
 
   it('match the expected totals for pull day', () => {
-    // 34 sets: 31 × 40s + one arm row 3 × 80s (one arm at a time).
-    expect(totals(PULL_DAY_ITEMS)).toEqual([91, 68, 78]);
+    // 35 sets: 32 × 40s + one arm row 3 × 80s (one arm at a time).
+    expect(totals(PULL_DAY_ITEMS)).toEqual([93, 69, 80]);
   });
 
   it('every day has unique item ids and its own storage key', () => {
