@@ -23,12 +23,14 @@ import {
 } from './engine';
 import { usePersistentState } from './hooks/usePersistentState';
 import { useRefreshGuard } from './hooks/useRefreshGuard';
+import { useLockScreenTimer } from './hooks/useLockScreenTimer';
 import { useSound } from './hooks/useSound';
 import { useTicker } from './hooks/useTicker';
 import { useWakeLock } from './hooks/useWakeLock';
 import { DayPicker } from './components/DayPicker';
 import { ExerciseCard, type ChipView } from './components/ExerciseCard';
 import { GymMode } from './components/GymMode';
+import { InstallCard } from './components/InstallCard';
 import { phaseView, type PhaseActionId } from './components/phaseView';
 import { Header } from './components/Header';
 import { PhaseTimer } from './components/PhaseTimer';
@@ -39,6 +41,7 @@ import { Toast } from './components/Toast';
 
 const GYM_KEY = 'push-day:gym-mode';
 const DAY_KEY = 'gym:active-day';
+const LOCK_KEY = 'gym:lock-screen-timer';
 
 /** Picks the workout day; each day keeps its own saved progress. */
 export function App() {
@@ -110,6 +113,23 @@ function Workout({ day, onSwitchDay }: { day: WorkoutDay; onSwitchDay: (id: stri
     }
   }, []);
   const exitGymMode = useCallback(() => setGymMode(false), [setGymMode]);
+
+  // Lock-screen timer (Media Session). On by default — it pauses the phone's music.
+  const [lockTimer, setLockTimerState] = useState(() => {
+    try {
+      return localStorage.getItem(LOCK_KEY) !== '0';
+    } catch {
+      return true;
+    }
+  });
+  const setLockTimer = useCallback((on: boolean) => {
+    setLockTimerState(on);
+    try {
+      localStorage.setItem(LOCK_KEY, on ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   // Keep the screen on during the workout, and whenever gym mode is open.
   const wake = useWakeLock(running || gymMode);
@@ -188,6 +208,17 @@ function Workout({ day, onSwitchDay }: { day: WorkoutDay; onSwitchDay: (id: stri
     else if (id === 'doneEarly') dispatch({ type: 'finishSet', now: t });
     else dispatch({ type: 'dismissRest', now: t });
   };
+  useLockScreenTimer({
+    active: lockTimer && running,
+    phase,
+    view,
+    dayName: day.name,
+    now,
+    onPrimary: () => {
+      const primary = view.actions.find((a) => a.primary);
+      if (primary && !primary.disabled) onPhaseAction(primary.id);
+    },
+  });
   const reminder = reminderFor(WORKOUT, state);
   const left = timeLeft(WORKOUT, state, now);
   const canStartFromChip = phase.kind === 'idle' || phase.kind === 'complete' || (phase.kind === 'rest' && !locked);
@@ -224,6 +255,7 @@ function Workout({ day, onSwitchDay }: { day: WorkoutDay; onSwitchDay: (id: stri
       </div>
 
       <main className="content">
+        {!running && <InstallCard />}
         <DayPicker
           days={DAYS}
           activeId={day.id}
@@ -297,6 +329,15 @@ function Workout({ day, onSwitchDay }: { day: WorkoutDay; onSwitchDay: (id: stri
           >
             {confirmReset ? 'Tap again to reset' : 'Reset workout'}
           </button>
+          <button
+            type="button"
+            className={`btn btn--ghost footer__lock${lockTimer ? ' is-on' : ''}`}
+            onClick={() => setLockTimer(!lockTimer)}
+            aria-pressed={lockTimer}
+          >
+            Lock-screen timer: {lockTimer ? 'On' : 'Off'}
+          </button>
+          <p className="footer__note">Shows the timer on your lock screen. Pauses your music.</p>
         </div>
       </main>
 

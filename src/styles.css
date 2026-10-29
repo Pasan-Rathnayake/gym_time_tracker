@@ -412,6 +412,48 @@ button {
   margin-bottom: 8px;
 }
 
+/* ---------- install card ---------- */
+
+.install-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+
+.install-card__body {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.install-card__title {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.install-card__text {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.install-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.install-card__actions .btn--primary {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+
 /* ---------- reminder ---------- */
 
 .reminder {
@@ -654,6 +696,19 @@ button {
 
 .footer {
   padding-top: 6px;
+  display: grid;
+  gap: 10px;
+}
+
+.footer__lock.is-on {
+  border-color: var(--rest);
+  color: var(--rest);
+}
+
+.footer__note {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
 }
 
 .toast-wrap {

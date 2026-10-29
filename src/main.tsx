@@ -7,6 +7,8 @@ import '@fontsource/barlow-condensed/latin-700.css';
 import '@fontsource/jetbrains-mono/latin-500.css';
 import '@fontsource/jetbrains-mono/latin-700.css';
 import './styles.css';
+// Register beforeinstallprompt as early as possible (before React mounts).
+import './hooks/useInstallPrompt';
 import { App } from './App';
 
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
