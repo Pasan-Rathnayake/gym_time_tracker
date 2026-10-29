@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { READY_SEC } from '../config/workout';
-import type { Phase } from '../engine';
+import { readyStartedAt, type Phase } from '../engine';
 import type { PhaseView } from '../components/phaseView';
 
 /** ~10s silent WAV (8 kHz, 8-bit mono). Longer than 5s so Chrome shows media controls. */
@@ -58,8 +57,8 @@ function phaseBounds(phase: Phase, now: number): { duration: number; position: n
     return { duration, position };
   }
   if (phase.kind === 'ready') {
-    const startedAt = phase.endAt - READY_SEC * 1000;
-    const duration = READY_SEC;
+    const startedAt = readyStartedAt(phase);
+    const duration = (phase.endAt - startedAt) / 1000;
     const position = Math.min(duration, Math.max(0, (now - startedAt) / 1000));
     return { duration, position };
   }

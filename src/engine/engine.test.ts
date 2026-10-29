@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { DAYS, FORM_CUES, INCLUDE_TIMED_BLOCKS, LEG_DAY_ITEMS, PULL_DAY_ITEMS, PUSH_DAY_ITEMS, READY_SEC, type WorkoutItem } from '../config/workout';
+import {
+  DAYS,
+  FORM_CUES,
+  INCLUDE_TIMED_BLOCKS,
+  LEG_DAY_ITEMS,
+  PULL_DAY_ITEMS,
+  PUSH_DAY_ITEMS,
+  READY_SEC,
+  SUPERSET_SWITCH_SEC,
+  UPPER_DAY_ITEMS,
+  type WorkoutItem,
+} from '../config/workout';
 import {
   MIN,
   indexItems,
@@ -10,6 +21,7 @@ import {
   nextSet,
   normalizeState,
   planTotal,
+  remainingSets,
   reminderFor,
   restAfter,
   restLocked,
@@ -63,6 +75,11 @@ describe('plan totals', () => {
   it('match the expected totals for pull day', () => {
     // 32 sets: 29 × 40s + one arm row 3 × 80s (one arm at a time).
     expect(totals(PULL_DAY_ITEMS)).toEqual([85, 63, 72]);
+  });
+
+  it('match the expected totals for upper body day', () => {
+    // 40 sets × 40s + 7 superset switches × 30s + 32 rests under each plan.
+    expect(totals(UPPER_DAY_ITEMS)).toEqual([94, 71, 86]);
   });
 
   it('every day has unique item ids and its own storage key', () => {
@@ -377,5 +394,59 @@ describe('persistence', () => {
     expect(s.done['pec-dec']).toEqual([true, false, false, false]);
     expect(s.plan).toBe(1);
     expect(normalizeState('junk', WORKOUT)).toEqual(initialState(WORKOUT));
+  });
+});
+
+describe('supersets', () => {
+  const upper = indexItems(UPPER_DAY_ITEMS);
+  const reduceUpper = makeReducer(UPPER_DAY_ITEMS);
+
+  it('interleaves the lifts set by set, at the first lift\'s spot', () => {
+    const order = remainingSets(UPPER_DAY_ITEMS, initialState(UPPER_DAY_ITEMS)).map((r) => `${r.itemId}:${r.set}`);
+    expect(order.slice(0, 9)).toEqual([
+      'ub-pec-dec:0',
+      'ub-pullups:0',
+      'ub-pec-dec:1',
+      'ub-pullups:1',
+      'ub-pec-dec:2',
+      'ub-pullups:2',
+      'ub-pec-dec:3',
+      'ub-pullups:3',
+      'ub-incline-db-press:0',
+    ]);
+  });
+
+  it('switches in 30s on every plan, and rests a full round after the second lift', () => {
+    const [a, b] = [upper['ub-pec-dec'], upper['ub-pullups']];
+    for (const plan of [1, 2, 3] as const) expect(restAfter(plan, a, b)).toBe(SUPERSET_SWITCH_SEC * 1000);
+    expect(restAfter(1, b, a)).toBe(2 * MIN);
+    expect(restAfter(2, b, a)).toBe(1 * MIN); // between sets of the superset
+    expect(restAfter(2, b, upper['ub-incline-db-press'])).toBe(2 * MIN); // between exercises
+    // Plan 3: the shoulder superset has a compound press, so its rounds get 2 min.
+    expect(restAfter(3, upper['ub-rope-shoulder'], upper['ub-barbell-shoulder-press'])).toBe(2 * MIN);
+  });
+
+  it('starts the second lift on its own when the switch runs out', () => {
+    let s = reduceUpper(initialState(UPPER_DAY_ITEMS), { type: 'startReady', now: T0 });
+    s = reduceUpper(s, { type: 'tick', now: T0 + READY_SEC * 1000 });
+    expect(s.phase).toMatchObject({ kind: 'work', itemId: 'ub-pec-dec', set: 0 });
+    const end = (s.phase as { endAt: number }).endAt;
+    s = reduceUpper(s, { type: 'tick', now: end });
+    expect(s.phase).toEqual({ kind: 'ready', itemId: 'ub-pullups', set: 0, endAt: end + SUPERSET_SWITCH_SEC * 1000, switch: true });
+    s = reduceUpper(s, { type: 'tick', now: end + SUPERSET_SWITCH_SEC * 1000 });
+    expect(s.phase).toMatchObject({ kind: 'work', itemId: 'ub-pullups', set: 0 });
+    s = reduceUpper(s, { type: 'tick', now: (s.phase as { endAt: number }).endAt });
+    expect(s.phase).toMatchObject({ kind: 'rest', itemId: 'ub-pullups', set: 0 });
+    expect(nextSet(UPPER_DAY_ITEMS, s)).toEqual({ itemId: 'ub-pec-dec', set: 1 });
+  });
+
+  it('moves both lifts together on bench busy and bench free', () => {
+    let s = reduceUpper(initialState(UPPER_DAY_ITEMS), { type: 'benchBusy', itemId: 'ub-pullups' });
+    expect(s.queue.slice(-2)).toEqual(['ub-pec-dec', 'ub-pullups']);
+    expect(s.moved).toEqual(['ub-pec-dec', 'ub-pullups']);
+    expect(nextSet(UPPER_DAY_ITEMS, s)?.itemId).toBe('ub-incline-db-press');
+    s = reduceUpper(s, { type: 'benchFree', itemId: 'ub-pec-dec' });
+    expect(s.queue.slice(0, 2)).toEqual(['ub-pec-dec', 'ub-pullups']);
+    expect(s.moved).toEqual([]);
   });
 });

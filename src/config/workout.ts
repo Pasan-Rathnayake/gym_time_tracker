@@ -19,6 +19,17 @@ export interface WorkoutItem {
   tag?: string;
   /** Extra note after sets × reps, e.g. "each leg". */
   note?: string;
+  /** Set when the lift is part of a superset (see `superset()` below). */
+  superset?: SupersetInfo;
+}
+
+export interface SupersetInfo {
+  /** Shared by every lift in the superset. */
+  group: string;
+  /** Position in the superset: sets run 0, 1, 0, 1… */
+  index: number;
+  /** Any lift in the superset is compound: the round gets the longer rest under plan 3. */
+  compound: boolean;
 }
 
 export interface WorkoutDay {
@@ -41,6 +52,9 @@ export const REST_LOCK_SEC = 30;
 /** Length of the "Get ready" countdown, in seconds. */
 export const READY_SEC = 10;
 
+/** Gap between the lifts of a superset, in seconds. The next set starts on its own after it. */
+export const SUPERSET_SWITCH_SEC = 30;
+
 interface LiftOptions {
   /** Compound lift: longer rest under plan 3. */
   compound?: boolean;
@@ -61,6 +75,15 @@ const lift = (id: string, name: string, sets: number, opts: LiftOptions = {}): W
   tag: opts.tag,
   note: opts.note,
 });
+
+/**
+ * Lifts done back to back, set by set: A1, B1, rest, A2, B2, rest… with
+ * SUPERSET_SWITCH_SEC between them and the plan's rest after each round.
+ */
+const superset = (group: string, ...lifts: WorkoutItem[]): WorkoutItem[] => {
+  const compound = lifts.some((l) => l.isPress);
+  return lifts.map((l, index) => ({ ...l, superset: { group, index, compound } }));
+};
 
 const timed = (id: string, name: string, type: ItemType, minutes: number): WorkoutItem => ({
   id,
@@ -123,6 +146,28 @@ export const PULL_DAY_ITEMS: WorkoutItem[] = [
   lift('forearms', 'Forearms', 3),
 ];
 
+/** Day 4, Upper Body. Pec dec + pull-ups and the two shoulder lifts are supersets. */
+export const UPPER_DAY_ITEMS: WorkoutItem[] = [
+  ...superset(
+    'chest-back',
+    lift('ub-pec-dec', 'Pec Dec Flys', 4),
+    lift('ub-pullups', 'Pull-ups', 4, { compound: true, tag: 'Compound' }),
+  ),
+  lift('ub-incline-db-press', 'Incline Dumbbell Press', 4, { compound: true }),
+  lift('ub-barbell-row', 'Barbell Row', 4, { compound: true, tag: 'Compound' }),
+  lift('ub-flat-press', 'Flat Chest Press', 3, { compound: true }),
+  lift('ub-neutral-pulldown', 'Neutral Grip Lat Pull Down', 3, { compound: true, tag: 'Compound' }),
+  ...superset(
+    'shoulders',
+    lift('ub-barbell-shoulder-press', 'Barbell Shoulder Press', 3, { compound: true }),
+    lift('ub-rope-shoulder', 'Rope Shoulder', 3),
+  ),
+  lift('ub-preacher-curl', 'Preacher Curl', 3),
+  lift('ub-rear-delt', 'Rear Delt Flys', 3, { reps: 12 }),
+  lift('ub-hammer-curl', 'Hammer Curls', 3),
+  lift('ub-lateral-raise', 'Lateral Raises', 3, { reps: 12 }),
+];
+
 /** The workout days, in the order shown on the day picker. */
 export const DAYS: WorkoutDay[] = [
   {
@@ -145,6 +190,13 @@ export const DAYS: WorkoutDay[] = [
     short: 'Pull Day',
     items: liftsOnly(PULL_DAY_ITEMS),
     storageKey: 'pull-day:session:v1',
+  },
+  {
+    id: 'upper',
+    name: 'Upper Body',
+    short: 'Upper Day',
+    items: liftsOnly(UPPER_DAY_ITEMS),
+    storageKey: 'upper-day:session:v1',
   },
 ];
 
@@ -188,6 +240,18 @@ export const FORM_CUES: Record<string, string> = {
   'reverse-curl': 'Palms down, wrists straight, lower slowly.',
   shrugs: 'Lift straight up toward the ears, pause, no rolling.',
   forearms: 'Full range at the wrist, slow and controlled.',
+  'ub-pec-dec': 'Soft elbows, squeeze the chest together and control the way back.',
+  'ub-pullups': 'Start from a dead hang, pull your chest to the bar, lower under control.',
+  'ub-incline-db-press': 'Shoulder blades pinned back, lower the dumbbells to the upper chest.',
+  'ub-barbell-row': 'Hinge forward, flat back, pull the bar to your lower ribs.',
+  'ub-flat-press': 'Feet planted, shoulder blades back, lower to mid-chest and press.',
+  'ub-neutral-pulldown': 'Palms facing each other, chest up, pull the elbows down to your sides.',
+  'ub-barbell-shoulder-press': 'Brace your core, press straight overhead, head through at the top.',
+  'ub-rope-shoulder': 'Elbows high, pull the rope apart toward your face and squeeze.',
+  'ub-preacher-curl': 'Arms flat on the pad, curl up and lower all the way slowly.',
+  'ub-rear-delt': 'Pinkies up, lead with the elbows and pause at the back.',
+  'ub-hammer-curl': 'Thumbs up, no swinging, keep the elbows still.',
+  'ub-lateral-raise': 'Lead with the elbows and stop at shoulder height. No swinging.',
 };
 
 /** Guides shown during the timed blocks, keyed by item id. */

@@ -1,5 +1,5 @@
-import { READY_SEC, type WorkoutItem } from '../config/workout';
-import { formatClock, restUnlockAt, type Phase, type SetRef } from '../engine';
+import type { WorkoutItem } from '../config/workout';
+import { formatClock, readyStartedAt, restUnlockAt, type Phase, type SetRef } from '../engine';
 
 export type PhaseActionId = 'start' | 'startNow' | 'cancel' | 'doneEarly' | 'dismiss';
 
@@ -42,10 +42,10 @@ export function phaseView(
       const left = phase.endAt - now;
       return {
         key: 'ready',
-        label: 'Get ready',
+        label: phase.switch ? 'Switch' : 'Get ready',
         title: setLabel(byId[phase.itemId], phase.set),
         time: String(Math.max(0, Math.ceil(left / 1000))),
-        fraction: 1 - left / (READY_SEC * 1000),
+        fraction: 1 - left / (phase.endAt - readyStartedAt(phase)),
         actions: [
           { id: 'startNow', label: 'Start now', primary: true, disabled: false },
           { id: 'cancel', label: 'Cancel', primary: false, disabled: false },

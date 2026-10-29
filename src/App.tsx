@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { DAYS, READY_SEC, type WorkoutDay } from './config/workout';
+import { DAYS, SUPERSET_SWITCH_SEC, type WorkoutDay } from './config/workout';
 import {
   formatClock,
   indexItems,
   initialState,
   isItemDone,
+  isSupersetSwitch,
   makeReducer,
   nextSet,
   normalizeState,
   orderedItems,
   planTotal,
   progress,
+  readyStartedAt,
   reminderFor,
   restAfter,
   restBetweenSets,
@@ -90,7 +92,7 @@ function Workout({ day, onSwitchDay }: { day: WorkoutDay; onSwitchDay: (id: stri
     phase.kind === 'work' || phase.kind === 'rest'
       ? phase.startedAt
       : phase.kind === 'ready'
-        ? phase.endAt - READY_SEC * 1000
+        ? readyStartedAt(phase)
         : 0;
   const now = Math.max(tickNow, anchor, stopwatch.runningSince ?? 0);
   const { cues: sound, ready: soundReady } = useSound();
@@ -158,7 +160,8 @@ function Workout({ day, onSwitchDay }: { day: WorkoutDay; onSwitchDay: (id: stri
       return;
     }
     if (secs === prev.secs) return;
-    if (phase.kind === 'ready' && secs >= 1) sound.tick();
+    // Tick every second of the get-ready, but only the last 3 of a superset switch.
+    if (phase.kind === 'ready' && secs >= 1 && (!phase.switch || secs <= 3)) sound.tick();
     if ((phase.kind === 'work' || phase.kind === 'rest') && secs >= 1 && secs <= 3) sound.tick();
   }, [now, phase, timedPhase, sound]);
 
@@ -297,7 +300,9 @@ function Workout({ day, onSwitchDay }: { day: WorkoutDay; onSwitchDay: (id: stri
               const between = restBetweenSets(state.plan, item);
               const afterEx = restAfter(state.plan, item, following);
               let restLabel = 'No rest';
-              if (item.type === 'lift') {
+              if (isSupersetSwitch(item, following)) {
+                restLabel = `Superset · ${SUPERSET_SWITCH_SEC}s then ${following!.name}`;
+              } else if (item.type === 'lift') {
                 restLabel = `Rest ${formatClock(between)}`;
                 if (afterEx !== between) restLabel += afterEx ? ` · ${formatClock(afterEx)} after` : ' · none after';
               }

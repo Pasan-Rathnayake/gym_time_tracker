@@ -1,5 +1,14 @@
-import { READY_SEC, REST_LOCK_SEC, type WorkoutItem } from '../config/workout';
-import { indexItems, restAfter, sequenceTime, type PlanId, type SetRef } from './rules';
+import { READY_SEC, REST_LOCK_SEC, SUPERSET_SWITCH_SEC, type WorkoutItem } from '../config/workout';
+import {
+  indexItems,
+  isSupersetSwitch,
+  orderSets,
+  restAfter,
+  sequenceTime,
+  supersetIds,
+  type PlanId,
+  type SetRef,
+} from './rules';
 
 /**
  * Session state machine:
@@ -8,7 +17,8 @@ import { indexItems, restAfter, sequenceTime, type PlanId, type SetRef } from '.
  */
 export type Phase =
   | { kind: 'idle' }
-  | { kind: 'ready'; itemId: string; set: number; endAt: number }
+  /** `switch` is the gap inside a superset: longer than the usual get-ready. */
+  | { kind: 'ready'; itemId: string; set: number; endAt: number; switch?: boolean }
   | { kind: 'work'; itemId: string; set: number; startedAt: number; endAt: number }
   /** itemId/set are the set that was just finished. */
   | { kind: 'rest'; itemId: string; set: number; startedAt: number; endAt: number; alerted: boolean }
@@ -112,18 +122,18 @@ export function orderedItems(items: WorkoutItem[], queue: string[]): WorkoutItem
   return queue.map((id) => byId[id]).filter(Boolean);
 }
 
+/** When the current ready phase began: a superset switch runs longer than the get-ready. */
+export function readyStartedAt(phase: Extract<Phase, { kind: 'ready' }>): number {
+  return phase.endAt - (phase.switch ? SUPERSET_SWITCH_SEC : READY_SEC) * 1000;
+}
+
 export function isItemDone(state: SessionState, itemId: string): boolean {
   return (state.done[itemId] ?? []).every(Boolean);
 }
 
-/** All unfinished sets, in queue order. */
+/** All unfinished sets, in queue order (superset lifts interleaved). */
 export function remainingSets(items: WorkoutItem[], state: SessionState): SetRef[] {
-  const out: SetRef[] = [];
-  for (const item of orderedItems(items, state.queue)) {
-    const d = state.done[item.id] ?? [];
-    for (let s = 0; s < item.sets; s++) if (!d[s]) out.push({ itemId: item.id, set: s });
-  }
-  return out;
+  return orderSets(orderedItems(items, state.queue), (ref) => !state.done[ref.itemId]?.[ref.set]);
 }
 
 /** The next set to do: first unfinished set in queue order. */
@@ -257,6 +267,11 @@ function finishSet(items: WorkoutItem[], state: SessionState, at: number): Sessi
     };
   }
 
+  // Inside a superset, count down the switch and start the next lift on its own.
+  if (isSupersetSwitch(byId[p.itemId], byId[next.itemId])) {
+    return { ...after, phase: { kind: 'ready', ...next, endAt: at + SUPERSET_SWITCH_SEC * 1000, switch: true } };
+  }
+
   const rest = restFor(items, after, p, state.plan);
   if (rest > 0) {
     return {
@@ -332,22 +347,26 @@ export function makeReducer(items: WorkoutItem[]) {
         };
       }
 
+      // A superset's lifts share the bench and move together.
       case 'benchBusy': {
-        if (p.kind === 'work' && p.itemId === action.itemId) return state;
-        if (isItemDone(state, action.itemId) || byId[action.itemId]?.type === 'cool') return state;
+        const ids = supersetIds(items, action.itemId);
+        if (p.kind === 'work' && ids.includes(p.itemId)) return state;
+        if (ids.every((id) => isItemDone(state, id)) || byId[action.itemId]?.type === 'cool') return state;
         return {
           ...state,
-          queue: moveLater(items, state.queue, action.itemId),
-          moved: state.moved.includes(action.itemId) ? state.moved : [...state.moved, action.itemId],
+          queue: ids.reduce((q, id) => moveLater(items, q, id), state.queue),
+          moved: [...state.moved.filter((id) => !ids.includes(id)), ...ids],
         };
       }
 
       case 'benchFree': {
-        if (p.kind === 'work' && p.itemId === action.itemId) return state;
+        const ids = supersetIds(items, action.itemId);
+        if (p.kind === 'work' && ids.includes(p.itemId)) return state;
         return {
           ...state,
-          queue: moveNext(items, state.queue, state.done, action.itemId),
-          moved: state.moved.filter((id) => id !== action.itemId),
+          // Last first, so each moveNext lands the earlier lift in front of it.
+          queue: [...ids].reverse().reduce((q, id) => moveNext(items, q, state.done, id), state.queue),
+          moved: state.moved.filter((id) => !ids.includes(id)),
         };
       }
 
