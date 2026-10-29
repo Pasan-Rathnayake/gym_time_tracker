@@ -208,16 +208,25 @@ function Workout({ day, onSwitchDay }: { day: WorkoutDay; onSwitchDay: (id: stri
     else if (id === 'doneEarly') dispatch({ type: 'finishSet', now: t });
     else dispatch({ type: 'dismissRest', now: t });
   };
+  const lockArt = useMemo(() => {
+    if (phase.kind === 'ready' || phase.kind === 'work') {
+      const item = byId[phase.itemId];
+      return item ? { name: item.name, set: phase.set, sets: item.sets } : null;
+    }
+    if (phase.kind === 'rest' || phase.kind === 'idle') {
+      if (!next) return null;
+      const item = byId[next.itemId];
+      return item ? { name: item.name, set: next.set, sets: item.sets } : null;
+    }
+    return null;
+  }, [phase, byId, next]);
   useLockScreenTimer({
     active: lockTimer && running,
     phase,
     view,
     dayName: day.name,
     now,
-    onPrimary: () => {
-      const primary = view.actions.find((a) => a.primary);
-      if (primary && !primary.disabled) onPhaseAction(primary.id);
-    },
+    art: lockArt,
   });
   const reminder = reminderFor(WORKOUT, state);
   const left = timeLeft(WORKOUT, state, now);
