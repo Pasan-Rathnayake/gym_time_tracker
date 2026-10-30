@@ -1,4 +1,4 @@
-import { SUPERSET_SWITCH_SEC, type WorkoutItem } from '../config/workout';
+import type { WorkoutItem } from '../config/workout';
 
 export type PlanId = 1 | 2 | 3;
 
@@ -34,11 +34,11 @@ export interface SetRef {
  * Rest in ms after finishing a set of `item`, when the next set to do belongs
  * to `next`. Only lift → lift transitions get a rest; timed blocks, the last
  * lift before the cool-down and the very last set get none. Inside a superset
- * the switch is SUPERSET_SWITCH_SEC, and a round counts as one exercise's set.
+ * the switch is the superset's switch time, and a round counts as one exercise's set.
  */
 export function restAfter(plan: PlanId, item: WorkoutItem, next: WorkoutItem | undefined): number {
   if (item.type !== 'lift' || !next || next.type !== 'lift') return 0;
-  if (isSupersetSwitch(item, next)) return SUPERSET_SWITCH_SEC * 1000;
+  if (isSupersetSwitch(item, next)) return item.superset!.switchSec * 1000;
   const sameExercise = next.id === item.id || (!!item.superset && item.superset.group === next.superset?.group);
   const compound = item.superset ? item.superset.compound : item.isPress;
   switch (plan) {

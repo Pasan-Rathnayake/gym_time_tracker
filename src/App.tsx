@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { DAYS, SUPERSET_SWITCH_SEC, type WorkoutDay } from './config/workout';
+import { DAYS, type WorkoutDay } from './config/workout';
 import {
   formatClock,
   indexItems,
@@ -161,7 +161,7 @@ function Workout({ day, onSwitchDay }: { day: WorkoutDay; onSwitchDay: (id: stri
     }
     if (secs === prev.secs) return;
     // Tick every second of the get-ready, but only the last 3 of a superset switch.
-    if (phase.kind === 'ready' && secs >= 1 && (!phase.switch || secs <= 3)) sound.tick();
+    if (phase.kind === 'ready' && secs >= 1 && (!phase.switchSec || secs <= 3)) sound.tick();
     if ((phase.kind === 'work' || phase.kind === 'rest') && secs >= 1 && secs <= 3) sound.tick();
   }, [now, phase, timedPhase, sound]);
 
@@ -288,7 +288,7 @@ function Workout({ day, onSwitchDay }: { day: WorkoutDay; onSwitchDay: (id: stri
               const chips: ChipView[] = d.map((isDone, set) => {
                 const here = (phase.kind === 'ready' || phase.kind === 'work') && phase.itemId === item.id && phase.set === set;
                 if (here && phase.kind === 'ready')
-                  return { state: 'readying', countdown: String(Math.max(0, Math.ceil((phase.endAt - now) / 1000))), disabled: false };
+                  return { state: 'readying', countdown: view.time, disabled: false };
                 if (here && phase.kind === 'work')
                   return { state: 'working', countdown: formatClock(phase.endAt - now), disabled: false };
                 if (isDone) return { state: 'done', disabled: phase.kind === 'work' };
@@ -301,7 +301,9 @@ function Workout({ day, onSwitchDay }: { day: WorkoutDay; onSwitchDay: (id: stri
               const afterEx = restAfter(state.plan, item, following);
               let restLabel = 'No rest';
               if (isSupersetSwitch(item, following)) {
-                restLabel = `Superset · ${SUPERSET_SWITCH_SEC}s then ${following!.name}`;
+                const { label, switchSec } = item.superset!;
+                const gap = switchSec < 60 ? `${switchSec}s` : formatClock(switchSec * 1000);
+                restLabel = `${label} · ${gap} then ${following!.name}`;
               } else if (item.type === 'lift') {
                 restLabel = `Rest ${formatClock(between)}`;
                 if (afterEx !== between) restLabel += afterEx ? ` · ${formatClock(afterEx)} after` : ' · none after';

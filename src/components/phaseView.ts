@@ -42,9 +42,10 @@ export function phaseView(
       const left = phase.endAt - now;
       return {
         key: 'ready',
-        label: phase.switch ? 'Switch' : 'Get ready',
+        label: phase.switchSec ? 'Switch' : 'Get ready',
         title: setLabel(byId[phase.itemId], phase.set),
-        time: String(Math.max(0, Math.ceil(left / 1000))),
+        // Count seconds for short countdowns, a clock for longer switches.
+        time: phase.switchSec && phase.switchSec >= 60 ? formatClock(left) : String(Math.max(0, Math.ceil(left / 1000))),
         fraction: 1 - left / (phase.endAt - readyStartedAt(phase)),
         actions: [
           { id: 'startNow', label: 'Start now', primary: true, disabled: false },

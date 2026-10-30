@@ -4,6 +4,7 @@ import {
   FORM_CUES,
   INCLUDE_TIMED_BLOCKS,
   LEG_DAY_ITEMS,
+  LOWER_DAY_ITEMS,
   PULL_DAY_ITEMS,
   PUSH_DAY_ITEMS,
   READY_SEC,
@@ -80,6 +81,11 @@ describe('plan totals', () => {
   it('match the expected totals for upper body day', () => {
     // 40 sets × 40s + 7 superset switches × 30s + 32 rests under each plan.
     expect(totals(UPPER_DAY_ITEMS)).toEqual([94, 71, 86]);
+  });
+
+  it('match the expected totals for lower body day', () => {
+    // 34 sets: 31 × 40s + leg extension 3 × 80s, 3 split squat leg switches × 2 min, 30 rests under each plan.
+    expect(totals(LOWER_DAY_ITEMS)).toEqual([91, 70, 80]);
   });
 
   it('every day has unique item ids and its own storage key', () => {
@@ -432,12 +438,48 @@ describe('supersets', () => {
     expect(s.phase).toMatchObject({ kind: 'work', itemId: 'ub-pec-dec', set: 0 });
     const end = (s.phase as { endAt: number }).endAt;
     s = reduceUpper(s, { type: 'tick', now: end });
-    expect(s.phase).toEqual({ kind: 'ready', itemId: 'ub-pullups', set: 0, endAt: end + SUPERSET_SWITCH_SEC * 1000, switch: true });
+    expect(s.phase).toEqual({
+      kind: 'ready',
+      itemId: 'ub-pullups',
+      set: 0,
+      endAt: end + SUPERSET_SWITCH_SEC * 1000,
+      switchSec: SUPERSET_SWITCH_SEC,
+    });
     s = reduceUpper(s, { type: 'tick', now: end + SUPERSET_SWITCH_SEC * 1000 });
     expect(s.phase).toMatchObject({ kind: 'work', itemId: 'ub-pullups', set: 0 });
     s = reduceUpper(s, { type: 'tick', now: (s.phase as { endAt: number }).endAt });
     expect(s.phase).toMatchObject({ kind: 'rest', itemId: 'ub-pullups', set: 0 });
     expect(nextSet(UPPER_DAY_ITEMS, s)).toEqual({ itemId: 'ub-pec-dec', set: 1 });
+  });
+
+  it('gives the split squat 2 min between legs, then the plan rest after the right leg', () => {
+    const lower = indexItems(LOWER_DAY_ITEMS);
+    const [left, right] = [lower['lb-split-squat-left'], lower['lb-split-squat-right']];
+    for (const plan of [1, 2, 3] as const) expect(restAfter(plan, left, right)).toBe(2 * MIN);
+    expect(restAfter(2, right, left)).toBe(1 * MIN);
+    const order = remainingSets(LOWER_DAY_ITEMS, initialState(LOWER_DAY_ITEMS)).map((r) => r.itemId);
+    expect(order.slice(3, 9)).toEqual([
+      'lb-split-squat-left',
+      'lb-split-squat-right',
+      'lb-split-squat-left',
+      'lb-split-squat-right',
+      'lb-split-squat-left',
+      'lb-split-squat-right',
+    ]);
+  });
+
+  it('goes to the other leg after a split squat set started out of order', () => {
+    const reduceLower = makeReducer(LOWER_DAY_ITEMS);
+    let s = reduceLower(initialState(LOWER_DAY_ITEMS), { type: 'startReady', now: T0, itemId: 'lb-split-squat-left', set: 0 });
+    s = reduceLower(s, { type: 'startWork', now: T0 });
+    s = reduceLower(s, { type: 'finishSet', now: T0 + 40_000 });
+    expect(s.phase).toEqual({
+      kind: 'ready',
+      itemId: 'lb-split-squat-right',
+      set: 0,
+      endAt: T0 + 40_000 + 2 * MIN,
+      switchSec: 120,
+    });
   });
 
   it('moves both lifts together on bench busy and bench free', () => {

@@ -30,6 +30,10 @@ export interface SupersetInfo {
   index: number;
   /** Any lift in the superset is compound: the round gets the longer rest under plan 3. */
   compound: boolean;
+  /** Gap between its lifts, in seconds. The next lift starts on its own after it. */
+  switchSec: number;
+  /** Shown on the first lift's card before the switch time, e.g. "Superset". */
+  label: string;
 }
 
 export interface WorkoutDay {
@@ -52,7 +56,7 @@ export const REST_LOCK_SEC = 30;
 /** Length of the "Get ready" countdown, in seconds. */
 export const READY_SEC = 10;
 
-/** Gap between the lifts of a superset, in seconds. The next set starts on its own after it. */
+/** Default gap between the lifts of a superset, in seconds. The next set starts on its own after it. */
 export const SUPERSET_SWITCH_SEC = 30;
 
 interface LiftOptions {
@@ -76,13 +80,22 @@ const lift = (id: string, name: string, sets: number, opts: LiftOptions = {}): W
   note: opts.note,
 });
 
+interface SupersetOptions {
+  /** Gap between the lifts, in seconds (default SUPERSET_SWITCH_SEC). */
+  switchSec?: number;
+  /** Card label, default "Superset". */
+  label?: string;
+}
+
 /**
- * Lifts done back to back, set by set: A1, B1, rest, A2, B2, rest… with
- * SUPERSET_SWITCH_SEC between them and the plan's rest after each round.
+ * Lifts done back to back, set by set: A1, B1, rest, A2, B2, rest… with the
+ * switch time between them and the plan's rest after each round.
  */
-const superset = (group: string, ...lifts: WorkoutItem[]): WorkoutItem[] => {
+const superset = (group: string, lifts: WorkoutItem[], opts: SupersetOptions = {}): WorkoutItem[] => {
   const compound = lifts.some((l) => l.isPress);
-  return lifts.map((l, index) => ({ ...l, superset: { group, index, compound } }));
+  const switchSec = opts.switchSec ?? SUPERSET_SWITCH_SEC;
+  const label = opts.label ?? 'Superset';
+  return lifts.map((l, index) => ({ ...l, superset: { group, index, compound, switchSec, label } }));
 };
 
 const timed = (id: string, name: string, type: ItemType, minutes: number): WorkoutItem => ({
@@ -148,24 +161,44 @@ export const PULL_DAY_ITEMS: WorkoutItem[] = [
 
 /** Day 4, Upper Body. Pec dec + pull-ups and the two shoulder lifts are supersets. */
 export const UPPER_DAY_ITEMS: WorkoutItem[] = [
-  ...superset(
-    'chest-back',
+  ...superset('chest-back', [
     lift('ub-pec-dec', 'Pec Dec Flys', 4),
     lift('ub-pullups', 'Pull-ups', 4, { compound: true, tag: 'Compound' }),
-  ),
+  ]),
   lift('ub-incline-db-press', 'Incline Dumbbell Press', 4, { compound: true }),
   lift('ub-barbell-row', 'Barbell Row', 4, { compound: true, tag: 'Compound' }),
   lift('ub-flat-press', 'Flat Chest Press', 3, { compound: true }),
   lift('ub-neutral-pulldown', 'Neutral Grip Lat Pull Down', 3, { compound: true, tag: 'Compound' }),
-  ...superset(
-    'shoulders',
+  ...superset('shoulders', [
     lift('ub-barbell-shoulder-press', 'Barbell Shoulder Press', 3, { compound: true }),
     lift('ub-rope-shoulder', 'Rope Shoulder', 3),
-  ),
+  ]),
   lift('ub-preacher-curl', 'Preacher Curl', 3),
   lift('ub-rear-delt', 'Rear Delt Flys', 3, { reps: 12 }),
   lift('ub-hammer-curl', 'Hammer Curls', 3),
   lift('ub-lateral-raise', 'Lateral Raises', 3, { reps: 12 }),
+];
+
+/** Day 5, Lower Body. Split squats are done one leg at a time, 2 min apart. */
+export const LOWER_DAY_ITEMS: WorkoutItem[] = [
+  lift('lb-rdl', 'RDL', 3, { compound: true, tag: 'Compound' }),
+  ...superset(
+    'split-squat',
+    [
+      lift('lb-split-squat-left', 'Bulgarian Split Squat · Left', 3, { compound: true, tag: 'Compound' }),
+      lift('lb-split-squat-right', 'Bulgarian Split Squat · Right', 3, { compound: true, tag: 'Compound' }),
+    ],
+    { switchSec: 120, label: 'Leg switch' },
+  ),
+  lift('lb-leg-press', 'Leg Press', 3, { compound: true, tag: 'Compound' }),
+  lift('lb-triceps-pushdown', 'Triceps Push Down', 4),
+  lift('lb-hip-thrust', 'Hip Thrust', 3, { compound: true, tag: 'Compound' }),
+  lift('lb-cable-triceps', 'Cable Triceps Push Up', 3),
+  // One leg at a time, so each set gets twice the time (40s per leg).
+  lift('lb-leg-extension', 'Leg Extension', 3, { note: 'each leg', durationSec: LIFT_SET_SEC * 2 }),
+  lift('lb-triceps-dips', 'Triceps Dips', 3, { compound: true, tag: 'Compound' }),
+  lift('lb-leg-curl', 'Leg Curls', 3),
+  lift('lb-calf-raise', 'Standing Calf Raises', 3),
 ];
 
 /** The workout days, in the order shown on the day picker. */
@@ -197,6 +230,13 @@ export const DAYS: WorkoutDay[] = [
     short: 'Upper Day',
     items: liftsOnly(UPPER_DAY_ITEMS),
     storageKey: 'upper-day:session:v1',
+  },
+  {
+    id: 'lower',
+    name: 'Lower Body',
+    short: 'Lower Day',
+    items: liftsOnly(LOWER_DAY_ITEMS),
+    storageKey: 'lower-day:session:v1',
   },
 ];
 
@@ -252,6 +292,17 @@ export const FORM_CUES: Record<string, string> = {
   'ub-rear-delt': 'Pinkies up, lead with the elbows and pause at the back.',
   'ub-hammer-curl': 'Thumbs up, no swinging, keep the elbows still.',
   'ub-lateral-raise': 'Lead with the elbows and stop at shoulder height. No swinging.',
+  'lb-rdl': 'Soft knees, push the hips back, bar close to the legs. Stop when the back starts to round.',
+  'lb-split-squat-left': 'Left foot forward, back foot on the bench. Drop straight down, front knee over the toes.',
+  'lb-split-squat-right': 'Right foot forward, back foot on the bench. Drop straight down, front knee over the toes.',
+  'lb-leg-press': 'Lower back flat on the pad, knees in line with the toes. Don\'t lock out.',
+  'lb-triceps-pushdown': 'Elbows pinned to your sides, lock out and squeeze at the bottom.',
+  'lb-hip-thrust': 'Chin tucked, drive through the heels and squeeze the glutes at the top.',
+  'lb-cable-triceps': 'Keep the elbows still and only move the forearms.',
+  'lb-leg-extension': 'One leg at a time. Pause and squeeze at the top, lower slowly.',
+  'lb-triceps-dips': 'Body upright, lower until the elbows hit 90°, press to lockout.',
+  'lb-leg-curl': 'Hips down on the pad, curl all the way and lower slowly.',
+  'lb-calf-raise': 'Full stretch at the bottom, pause up high on the toes.',
 };
 
 /** Guides shown during the timed blocks, keyed by item id. */

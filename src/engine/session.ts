@@ -1,7 +1,6 @@
-import { READY_SEC, REST_LOCK_SEC, SUPERSET_SWITCH_SEC, type WorkoutItem } from '../config/workout';
+import { READY_SEC, REST_LOCK_SEC, type WorkoutItem } from '../config/workout';
 import {
   indexItems,
-  isSupersetSwitch,
   orderSets,
   restAfter,
   sequenceTime,
@@ -17,8 +16,8 @@ import {
  */
 export type Phase =
   | { kind: 'idle' }
-  /** `switch` is the gap inside a superset: longer than the usual get-ready. */
-  | { kind: 'ready'; itemId: string; set: number; endAt: number; switch?: boolean }
+  /** `switchSec` is set for the gap inside a superset, which replaces the usual get-ready. */
+  | { kind: 'ready'; itemId: string; set: number; endAt: number; switchSec?: number }
   | { kind: 'work'; itemId: string; set: number; startedAt: number; endAt: number }
   /** itemId/set are the set that was just finished. */
   | { kind: 'rest'; itemId: string; set: number; startedAt: number; endAt: number; alerted: boolean }
@@ -122,9 +121,9 @@ export function orderedItems(items: WorkoutItem[], queue: string[]): WorkoutItem
   return queue.map((id) => byId[id]).filter(Boolean);
 }
 
-/** When the current ready phase began: a superset switch runs longer than the get-ready. */
+/** When the current ready phase began: a superset switch has its own length. */
 export function readyStartedAt(phase: Extract<Phase, { kind: 'ready' }>): number {
-  return phase.endAt - (phase.switch ? SUPERSET_SWITCH_SEC : READY_SEC) * 1000;
+  return phase.endAt - (phase.switchSec ?? READY_SEC) * 1000;
 }
 
 export function isItemDone(state: SessionState, itemId: string): boolean {
@@ -267,9 +266,15 @@ function finishSet(items: WorkoutItem[], state: SessionState, at: number): Sessi
     };
   }
 
-  // Inside a superset, count down the switch and start the next lift on its own.
-  if (isSupersetSwitch(byId[p.itemId], byId[next.itemId])) {
-    return { ...after, phase: { kind: 'ready', ...next, endAt: at + SUPERSET_SWITCH_SEC * 1000, switch: true } };
+  // Inside a superset, count down the switch and start the next lift's same set
+  // on its own, even if this set was started out of queue order.
+  const ss = byId[p.itemId].superset;
+  const partner = ss && items.find((i) => i.superset?.group === ss.group && i.superset.index === ss.index + 1);
+  if (partner && after.done[partner.id]?.[p.set] === false) {
+    return {
+      ...after,
+      phase: { kind: 'ready', itemId: partner.id, set: p.set, endAt: at + ss.switchSec * 1000, switchSec: ss.switchSec },
+    };
   }
 
   const rest = restFor(items, after, p, state.plan);
